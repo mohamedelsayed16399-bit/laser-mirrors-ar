@@ -21,7 +21,7 @@ p{max-width:340px;line-height:1.5;opacity:.9;margin:6px}
 <div id="top"><span id="lvl"></span><span id="mv"></span><span id="gem"></span></div>
 <canvas id="c"></canvas>
 <div id="bar"><button class="s" id="menub">القايمة</button><button class="s" id="undo">↩️ تراجع</button><button id="hint">💡 تلميح (3💎)</button><button class="s" id="reset">🔄</button></div>
-<div class="ov" id="menu"><h1>ليزر المرايا</h1><p>وجّه أشعة الليزر لحد ما توصل للأهداف. دوس على المراية عشان تلفّها. كل مستوى مختلف وأصعب، وكل نجمة بتتحسب على عدد لفّاتك.</p><p id="sum"></p><div id="grid"></div></div>
+<div class="ov" id="menu"><h1>ليزر المرايا</h1><p>💎 من المستوى 9: المنشور ◆ بيقسم الشعاع لفرعين، لازم تنوّر كل أهداف اللون.</p><p>وجّه أشعة الليزر لحد ما توصل للأهداف. دوس على المراية عشان تلفّها. كل مستوى مختلف وأصعب، وكل نجمة بتتحسب على عدد لفّاتك.</p><p id="sum"></p><div id="grid"></div></div>
 <div class="ov hide" id="win"><h1>برافو!</h1><p id="wres"></p><button id="next">المستوى الجاي ◀</button><button class="s" id="wmenu">القايمة</button></div>
 <script>
 const cv=document.getElementById('c'),g=cv.getContext('2d');let W,H,DPR,CS,OX,OY;
@@ -39,9 +39,9 @@ function gen(n){const rnd=mul(n*7919+13);const N=Math.min(4+Math.floor((n-1)/3),
   const rows=[];const pool=[...Array(N).keys()];for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
   for(let k=0;k<nl&&ok;k++){const r=pool[k];let x=0,y=r,dx=1,dy=0;if(used.has(x+','+y)){ok=false;break}
    const target=Math.max(4,Math.floor(N*(1.2+rnd()*.8)));let steps=0,sol=[];const path=[];
-   const myCells=[];
+   const myCells=[];const strs=[];
    while(steps<60){const key=x+','+y;used.add(key);myCells.push(key);
-    let turn=0;
+    let turn=0;if(steps>=1)strs.push({x,y,dx,dy});
     if(steps>0&&steps>=target){cells[key]={t:'T',k};break}
     if(steps>=1&&rnd()<.5){// try to place mirror
       const opts=[];for(const m of['/','\\']){const nd=m==='/'?[-dy,-dx]:[dy,dx];const nx=x+nd[0],ny=y+nd[1];if(nx>=0&&ny>=0&&nx<N&&ny<N&&!used.has(nx+','+ny))opts.push([m,nd])}
@@ -49,9 +49,10 @@ function gen(n){const rnd=mul(n*7919+13);const N=Math.min(4+Math.floor((n-1)/3),
     const nx=x+dx,ny=y+dy;
     if(nx<0||ny<0||nx>=N||ny>=N||used.has(nx+','+ny)){if(!turn&&steps>=2){cells[key]={t:'T',k};break}else if(turn){ok=false;break}else{ok=false;break}}
     x=nx;y=ny;steps++;}
+   if(n>=9&&rnd()<.6){const cand=strs.filter(q=>!cells[q.x+','+q.y]);for(let a=0;a<cand.length;a++){const q=cand[Math.floor(rnd()*cand.length)];const sd=rnd()<.5?1:-1;const bx=-q.dy*sd,by=q.dx*sd;let cx=q.x+bx,cy=q.y+by,len=0;const bc=[];while(cx>=0&&cy>=0&&cx<N&&cy<N&&!used.has(cx+','+cy)&&len<4){bc.push([cx,cy]);cx+=bx;cy+=by;len++}if(bc.length>=2){const len2=2+Math.floor(rnd()*(bc.length-1));for(let i=0;i<len2;i++)used.add(bc[i].join(','));const e=bc[len2-1];cells[q.x+','+q.y]={t:'P',k,bx,by};cells[e.join(',')]={t:'T',k};break}}}
    lasers.push({row:r,k});}
   if(!ok)continue;
-  const tg=Object.values(cells).filter(c=>c.t==='T').length;if(tg!==nl)continue;
+  const tg=Object.values(cells).filter(c=>c.t==='T'&&!(cells&&0)).length;if(tg<nl)continue;
   // decoys and walls
   const total=N*N;const dec=Math.floor(total*.15)+Math.min(n,6);let tries=0,dcount=0;while(dcount<dec&&tries<100){tries++;const x=Math.floor(rnd()*N),y=Math.floor(rnd()*N);const key=x+','+y;if(used.has(key)||cells[key])continue;
    if(rnd()<.45)cells[key]={t:'W'};else cells[key]={t:'M',sol:rnd()<.5?'/':'\\',decoy:true};dcount++}
@@ -60,15 +61,17 @@ function gen(n){const rnd=mul(n*7919+13);const N=Math.min(4+Math.floor((n-1)/3),
   if(par===0)continue;
   const lv={N,cells,lasers,par};if(solved(lv))continue;return lv}
  return null}
-function trace(lv,las){const segs=[];let x=0,y=las.row,dx=1,dy=0;let hit=null;segs.push([-0.5,y,0,y]);let px=-0.5,py=y;
- for(let i=0;i<200;i++){const key=x+','+y;const c=lv.cells[key];
-  if(x<0||y<0||x>=lv.N||y>=lv.N){segs.push([px,py,x,y]);break}
+function trace(lv,las){const segs=[];const hits=new Set();const queue=[{x:0,y:las.row,dx:1,dy:0,px:-0.5,py:las.row}];let guard=0;
+ while(queue.length&&guard<600){let{x,y,dx,dy,px,py}=queue.pop();
+ for(let i=0;i<200;i++){guard++;const c=lv.cells[x+','+y];
+  if(x<0||y<0||x>=lv.N||y>=lv.N){segs.push([px,py,x-dx*.4,y-dy*.4]);break}
   if(c){if(c.t==='W'){segs.push([px,py,x-dx*.4,y-dy*.4]);break}
-   if(c.t==='T'){segs.push([px,py,x,y]);hit=c;break}
-   if(c.t==='M'){segs.push([px,py,x,y]);px=x;py=y;const o=c.s==='/'?[-dy,-dx]:[dy,dx];dx=o[0];dy=o[1];x+=dx;y+=dy;continue}}
-  x+=dx;y+=dy;if(x<0||y<0||x>=lv.N||y>=lv.N){segs.push([px,py,x-dx*.4,y-dy*.4]);break}}
- return{segs,hit}}
-function solved(lv){return lv.lasers.every(l=>{const r=trace(lv,l);return r.hit&&r.hit.k===l.k})}
+   if(c.t==='T'){segs.push([px,py,x,y]);hits.add(c);break}
+   if(c.t==='M'){segs.push([px,py,x,y]);px=x;py=y;const o=c.s==='/'?[-dy,-dx]:[dy,dx];dx=o[0];dy=o[1];x+=dx;y+=dy;continue}
+   if(c.t==='P'){segs.push([px,py,x,y]);px=x;py=y;queue.push({x:x+c.bx,y:y+c.by,dx:c.bx,dy:c.by,px:x,py:y});x+=dx;y+=dy;continue}}
+  x+=dx;y+=dy}}
+ return{segs,hits}}
+function solved(lv){return lv.lasers.every(l=>{const r=trace(lv,l);const need=Object.values(lv.cells).filter(c=>c.t==='T'&&c.k===l.k).length;let got=0;for(const h of r.hits)if(h.k===l.k)got++;return got===need})}
 function rs(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight-50-70;cv.style.width=W+'px';cv.style.height=H+'px';cv.width=W*DPR;cv.height=H*DPR;if(L)layout()}
 function layout(){CS=Math.floor(Math.min(W-20,H-10)/(L.N+1));OX=(W-CS*L.N)/2+CS*.3;OY=(H-CS*L.N)/2}
 addEventListener('resize',()=>{rs()});
@@ -98,13 +101,14 @@ function draw(){g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);if(!L)retur
  g.strokeStyle='#1d1d48';g.lineWidth=1;for(let i=0;i<=L.N;i++){g.beginPath();g.moveTo(X(i),Y(0));g.lineTo(X(i),Y(L.N));g.stroke();g.beginPath();g.moveTo(X(0),Y(i));g.lineTo(X(L.N),Y(i));g.stroke()}
  // beams
  const lit=[];for(const l of L.lasers){const r=trace(L,l);const col=COLS[l.k];g.shadowColor=col;g.shadowBlur=14;g.strokeStyle=col;g.lineWidth=4;g.lineCap='round';g.beginPath();for(const s of r.segs){g.moveTo(X(s[0]+.5),Y(s[1]+.5));g.lineTo(X(s[2]+.5),Y(s[3]+.5))}g.stroke();g.shadowBlur=0;g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();
-  if(r.hit&&r.hit.k===l.k)lit.push(l.k)}
+  for(const h of r.hits)if(h.k===l.k)lit.push(h)}
  // laser sources
  for(const l of L.lasers){g.fillStyle=COLS[l.k];g.fillRect(X(-.5),Y(l.row+.5)-8,12,16)}
  // cells
  for(const key in L.cells){const[c,r]=key.split(',').map(Number);const cell=L.cells[key];const cx=X(c+.5),cy=Y(r+.5),h=CS*.36;
   if(cell.t==='W'){g.fillStyle='#3a3a5a';g.fillRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8);g.strokeStyle='#5a5a8a';g.strokeRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8)}
-  else if(cell.t==='T'){const on=lit.includes(cell.k);g.fillStyle=on?COLS[cell.k]:'#222';g.strokeStyle=COLS[cell.k];g.lineWidth=3;g.shadowColor=COLS[cell.k];g.shadowBlur=on?22:0;g.beginPath();g.arc(cx,cy,CS*.3*(on?1+.1*Math.sin(T*8):1),0,6.3);g.fill();g.stroke();g.shadowBlur=0;g.beginPath();g.arc(cx,cy,CS*.12,0,6.3);g.fillStyle='#fff';g.fill()}
+  else if(cell.t==='T'){const on=lit.includes(cell);g.fillStyle=on?COLS[cell.k]:'#222';g.strokeStyle=COLS[cell.k];g.lineWidth=3;g.shadowColor=COLS[cell.k];g.shadowBlur=on?22:0;g.beginPath();g.arc(cx,cy,CS*.3*(on?1+.1*Math.sin(T*8):1),0,6.3);g.fill();g.stroke();g.shadowBlur=0;g.beginPath();g.arc(cx,cy,CS*.12,0,6.3);g.fillStyle='#fff';g.fill()}
+  else if(cell.t==='P'){g.fillStyle=COLS[cell.k];g.strokeStyle='#fff';g.lineWidth=2;g.save();g.translate(cx,cy);g.rotate(Math.PI/4);g.fillRect(-CS*.22,-CS*.22,CS*.44,CS*.44);g.strokeRect(-CS*.22,-CS*.22,CS*.44,CS*.44);g.restore();g.fillStyle='#fff';g.beginPath();g.moveTo(cx+cell.bx*CS*.35,cy+cell.by*CS*.35);g.lineTo(cx+cell.bx*CS*.12-cell.by*CS*.1,cy+cell.by*CS*.12+cell.bx*CS*.1);g.lineTo(cx+cell.bx*CS*.12+cell.by*CS*.1,cy+cell.by*CS*.12-cell.bx*CS*.1);g.fill()}
   else if(cell.t==='M'){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(cx-CS*.45,cy-CS*.45,CS*.9,CS*.9);g.strokeStyle=hinted===key&&Math.floor(T*4)%2?'#fd6':'#cfe8ff';g.lineWidth=hinted===key?7:5;g.lineCap='round';g.beginPath();if(cell.s==='/'){g.moveTo(cx-h,cy+h);g.lineTo(cx+h,cy-h)}else{g.moveTo(cx-h,cy-h);g.lineTo(cx+h,cy+h)}g.stroke()}}
  for(const p of parts){p.x+=p.vx*.02;p.y+=p.vy*.02;p.l-=.016}parts=parts.filter(p=>p.l>0);for(const p of parts){g.globalAlpha=Math.max(0,p.l);g.fillStyle=p.c;g.fillRect(X(p.x),Y(p.y),4,4)}g.globalAlpha=1}
 COLS=THEMES[sv.theme||0].c;rs();showMenu();
