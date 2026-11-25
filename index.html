@@ -20,7 +20,7 @@ p{max-width:340px;line-height:1.5;opacity:.9;margin:6px}
 </style></head><body>
 <div id="top"><span id="lvl"></span><span id="mv"></span><span id="gem"></span></div>
 <canvas id="c"></canvas>
-<div id="bar"><button class="s" id="menub">القايمة</button><button class="s" id="undo">↩️ تراجع</button><button id="hint">💡 تلميح (3💎)</button><button class="s" id="reset">🔄</button></div>
+<div id="bar"><button class="s" id="menub">القايمة</button><button class="s" id="undo">↩️ تراجع</button><button id="hint">💡 تلميح (3💎)</button><button class="s" id="reset">🔄</button><button class="s" id="sndb">🔊</button></div>
 <div class="ov" id="menu"><h1>ليزر المرايا</h1><p>💎 من المستوى 9: المنشور ◆ بيقسم الشعاع لفرعين، لازم تنوّر كل أهداف اللون.</p><p>وجّه أشعة الليزر لحد ما توصل للأهداف. دوس على المراية عشان تلفّها. كل مستوى مختلف وأصعب، وكل نجمة بتتحسب على عدد لفّاتك.</p><p id="sum"></p><div id="grid"></div></div>
 <div class="ov hide" id="win"><h1>برافو!</h1><p id="wres"></p><button id="next">المستوى الجاي ◀</button><button class="s" id="wmenu">القايمة</button></div>
 <script>
@@ -84,6 +84,7 @@ function start(n){ta=null;daily=false;cur=n;L=gen(n);if(!L){L=gen(n+1)}moves=0;h
 function upd(){document.getElementById('lvl').textContent='المستوى '+cur;document.getElementById('mv').textContent='لفّات: '+moves+' / مثالي '+L.par;document.getElementById('gem').textContent='💎 '+sv.gems}
 cv.addEventListener('pointerdown',e=>{if(!L||solvedAt)return;const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left-OX)/CS),y=Math.floor((e.clientY-r.top-OY)/CS);const c=L.cells[x+','+y];if(c&&c.t==='M'){c.s=c.s==='/'?'\\':'/';moves++;hist.push(x+','+y);hinted=null;beep(420,.08,'square',.04);for(let i=0;i<6;i++)parts.push({x:x+.5,y:y+.5,vx:Math.random()-.5,vy:Math.random()-.5,l:.4,c:'#fff'});upd();if(solved(L))win()}});
 document.getElementById('undo').onclick=()=>{if(!L||solvedAt||!hist.length)return;const k=hist.pop();const c=L.cells[k];c.s=c.s==='/'?'\\':'/';moves++;upd()};
+document.getElementById('sndb').onclick=function(){sv.snd=sv.snd?0:1;persist();this.textContent=sv.snd?'🔊':'🔇'};
 document.getElementById('reset').onclick=()=>ta?nextTA():daily?startDaily():start(cur);
 document.getElementById('hint').onclick=()=>{if(!L||solvedAt)return;if(sv.gems<3){beep(150,.2,'sawtooth');return}for(const k in L.cells){const c=L.cells[k];if(c.t==='M'&&!c.decoy&&c.s!==c.sol){sv.gems-=3;hinted=k;persist();upd();return}}};
 document.getElementById('menub').onclick=()=>{ta=null;showMenu()};document.getElementById('wmenu').onclick=showMenu;
@@ -95,7 +96,8 @@ function win(){if(ta){solvedAt=T;beep(880,.2,'sine',.07);ta.i++;if(ta.i>=5){cons
 function showMenu(){document.getElementById('win').classList.add('hide');const el=document.getElementById('grid');el.innerHTML='';const done=Object.keys(sv.stars).length;const maxu=Math.max(done+1,sv.last);let tot=0;for(const k in sv.stars)tot+=sv.stars[k];document.getElementById('sum').textContent='⭐ '+tot+' · 💎 '+sv.gems+' · خلّصت '+done+' مستوى';
  {const dd=document.createElement('button');dd.textContent=sv.dayDone===String(dayNum())?'🌟 تحدي اليوم (اتحل ✅)':'🌟 تحدي اليوم';dd.style.gridColumn='1 / -1';dd.onclick=startDaily;el.appendChild(dd);const tb=document.createElement('button');tb.className='s';tb.textContent='⏱️ تحدي السرعة: 5 ألغاز'+(sv.taBest?' (أحسن '+sv.taBest.toFixed(1)+' ث)':'');tb.style.gridColumn='1 / -1';tb.onclick=startTA;el.appendChild(tb);
   const th=document.createElement('div');th.style.cssText='grid-column:1/-1;display:flex;gap:6px;justify-content:center;flex-wrap:wrap';THEMES.forEach((t,i)=>{const b=document.createElement('button');b.className='s';const own=(sv.own||[0]).includes(i);b.style.cssText='font-size:12px;padding:6px 10px;border:2px solid '+(sv.theme===i?'#fd6':'transparent')+';color:'+t.c[0];b.textContent=t.n+(own?'':' 💎'+t.cost);b.onclick=()=>{if(!own){if(sv.gems<t.cost)return;sv.gems-=t.cost;sv.own.push(i)}setTheme(i);showMenu()};th.appendChild(b)});el.appendChild(th)}
- for(let i=1;i<=60;i++){const d=document.createElement('div');const unl=i<=maxu+1;d.className='lv'+(unl?'':' lock');d.innerHTML=i+'<small>'+('⭐'.repeat(sv.stars[i]||0))+'</small>';if(unl)d.onclick=()=>start(i);el.appendChild(d)}
+ const PK=['🌱 البداية','🔷 المنشور','🧩 المتاهة','🌈 ثلاثي الألوان','🎓 الأستاذ','👑 الخبير'];
+ for(let i=1;i<=60;i++){if((i-1)%10===0){const h=document.createElement('div');let st=0;for(let j=i;j<i+10;j++)st+=sv.stars[j]||0;h.style.cssText='grid-column:1/-1;text-align:right;font-weight:700;font-size:14px;color:#9cf;margin-top:6px';h.textContent=PK[(i-1)/10]+'  ⭐ '+st+'/30';el.appendChild(h)}const d=document.createElement('div');const unl=i<=maxu+1;d.className='lv'+(unl?'':' lock');d.innerHTML=i+'<small>'+('⭐'.repeat(sv.stars[i]||0))+'</small>';if(unl)d.onclick=()=>start(i);el.appendChild(d)}
  document.getElementById('menu').classList.remove('hide')}
 function X(x){return OX+x*CS}function Y(y){return OY+y*CS}
 function loop(ts){T=ts/1000;if(ta&&!solvedAt)document.getElementById('mv').textContent='⏱️ '+((performance.now()-ta.t0)/1000).toFixed(1)+' ث';draw();requestAnimationFrame(loop)}
@@ -115,6 +117,6 @@ function draw(){g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);if(!L)retur
   else if(cell.t==='M'){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(cx-CS*.45,cy-CS*.45,CS*.9,CS*.9);g.strokeStyle=hinted===key&&Math.floor(T*4)%2?'#fd6':'#cfe8ff';g.lineWidth=hinted===key?7:5;g.lineCap='round';g.beginPath();if(cell.s==='/'){g.moveTo(cx-h,cy+h);g.lineTo(cx+h,cy-h)}else{g.moveTo(cx-h,cy-h);g.lineTo(cx+h,cy+h)}g.stroke()}}
  if(cur===1&&moves===0&&!daily&&!ta&&!solvedAt){g.fillStyle='#fff';g.font='700 15px system-ui';g.textAlign='center';g.globalAlpha=.6+.4*Math.sin(T*5);g.fillText('👆 دوس على المراية عشان تلفها',W/2,OY+CS*L.N+28);g.globalAlpha=1}
  for(const p of parts){p.x+=p.vx*.02;p.y+=p.vy*.02;p.l-=.016}parts=parts.filter(p=>p.l>0);for(const p of parts){g.globalAlpha=Math.max(0,p.l);g.fillStyle=p.c;g.fillRect(X(p.x),Y(p.y),4,4)}g.globalAlpha=1}
-COLS=THEMES[sv.theme||0].c;rs();showMenu();
+COLS=THEMES[sv.theme||0].c;document.getElementById('sndb').textContent=sv.snd?'🔊':'🔇';rs();showMenu();
 window.__t={start,state:()=>L,solved,gen,trace,click:(x,y)=>{const c=L.cells[x+','+y];if(c&&c.t==='M'){c.s=c.s==='/'?'\\':'/';moves++;if(solved(L))win()}}};
 </script></body></html>
