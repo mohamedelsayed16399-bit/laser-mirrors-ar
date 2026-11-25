@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ليزر المرايا</title>
+<style>
+html,body{margin:0;height:100%;background:#06060f;overflow:hidden;font-family:system-ui,Tahoma,sans-serif;color:#fff;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#top{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-weight:700;font-size:16px}
+canvas{position:fixed;left:0;top:50px;}
+#bar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:10px;padding:12px;flex-wrap:wrap}
+button{font:inherit;font-size:16px;font-weight:700;color:#fff;background:linear-gradient(135deg,#00b4ff,#9b3dff);border:0;border-radius:12px;padding:10px 18px;box-shadow:0 3px 14px #9b3dff55}
+button.s{background:#1e1e3c;box-shadow:none}
+.ov{position:fixed;inset:0;background:rgba(6,6,20,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px;overflow:auto}
+.ov.hide{display:none}
+h1{margin:0;font-size:42px;background:linear-gradient(90deg,#0ff,#f0f,#ff0);-webkit-background-clip:text;color:transparent}
+p{max-width:340px;line-height:1.5;opacity:.9;margin:6px}
+#grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px;max-width:340px;width:90%}
+.lv{aspect-ratio:1;border-radius:12px;background:#171736;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;font-weight:700;border:2px solid #2c2c5c}
+.lv small{font-size:10px;color:#fd6}
+.lv.lock{opacity:.35}
+</style></head><body>
+<div id="top"><span id="lvl"></span><span id="mv"></span><span id="gem"></span></div>
+<canvas id="c"></canvas>
+<div id="bar"><button class="s" id="menub">القايمة</button><button class="s" id="undo">↩️ تراجع</button><button id="hint">💡 تلميح (3💎)</button><button class="s" id="reset">🔄</button></div>
+<div class="ov" id="menu"><h1>ليزر المرايا</h1><p>وجّه أشعة الليزر لحد ما توصل للأهداف. دوس على المراية عشان تلفّها. كل مستوى مختلف وأصعب، وكل نجمة بتتحسب على عدد لفّاتك.</p><p id="sum"></p><div id="grid"></div></div>
+<div class="ov hide" id="win"><h1>برافو!</h1><p id="wres"></p><button id="next">المستوى الجاي ◀</button><button class="s" id="wmenu">القايمة</button></div>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d');let W,H,DPR,CS,OX,OY;
+const SV='laser_mirrors_v1';let sv={stars:{},gems:6,snd:1,last:1};try{Object.assign(sv,JSON.parse(localStorage.getItem(SV)||'{}'))}catch(e){}
+const persist=()=>{try{localStorage.setItem(SV,JSON.stringify(sv))}catch(e){}};
+function mul(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+let AC;function beep(f,d,t,v){if(!sv.snd)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),gn=AC.createGain();o.type=t||'sine';o.frequency.value=f;gn.gain.value=v||.05;gn.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(gn);gn.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+const COLS=['#00e5ff','#ff3df0','#ffe600'];
+let L=null,parts=[],T=0,running=false,solvedAt=0;
+// level generation
+function gen(n){const rnd=mul(n*7919+13);const N=Math.min(4+Math.floor((n-1)/3),9);const nl=Math.min(1+Math.floor((n-1)/6),3);
+ for(let attempt=0;attempt<200;attempt++){
+  const used=new Set();const cells={};const lasers=[];let ok=true;
+  const rows=[];const pool=[...Array(N).keys()];for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
+  for(let k=0;k<nl&&ok;k++){const r=pool[k];let x=0,y=r,dx=1,dy=0;if(used.has(x+','+y)){ok=false;break}
+   const target=Math.max(4,Math.floor(N*(1.2+rnd()*.8)));let steps=0,sol=[];const path=[];
+   const myCells=[];
+   while(steps<60){const key=x+','+y;used.add(key);myCells.push(key);
+    let turn=0;
+    if(steps>0&&steps>=target){cells[key]={t:'T',k};break}
+    if(steps>=1&&rnd()<.5){// try to place mirror
+      const opts=[];for(const m of['/','\\']){const nd=m==='/'?[-dy,-dx]:[dy,dx];const nx=x+nd[0],ny=y+nd[1];if(nx>=0&&ny>=0&&nx<N&&ny<N&&!used.has(nx+','+ny))opts.push([m,nd])}
+      if(opts.length){const[m,nd]=opts[Math.floor(rnd()*opts.length)];cells[key]={t:'M',sol:m,k};dx=nd[0];dy=nd[1];turn=1}}
+    const nx=x+dx,ny=y+dy;
+    if(nx<0||ny<0||nx>=N||ny>=N||used.has(nx+','+ny)){if(!turn&&steps>=2){cells[key]={t:'T',k};break}else if(turn){ok=false;break}else{ok=false;break}}
+    x=nx;y=ny;steps++;}
+   lasers.push({row:r,k});}
+  if(!ok)continue;
+  const tg=Object.values(cells).filter(c=>c.t==='T').length;if(tg!==nl)continue;
+  // decoys and walls
+  const total=N*N;const dec=Math.floor(total*.15)+Math.min(n,6);let tries=0,dcount=0;while(dcount<dec&&tries<100){tries++;const x=Math.floor(rnd()*N),y=Math.floor(rnd()*N);const key=x+','+y;if(used.has(key)||cells[key])continue;
+   if(rnd()<.45)cells[key]={t:'W'};else cells[key]={t:'M',sol:rnd()<.5?'/':'\\',decoy:true};dcount++}
+  // scramble
+  let par=0;for(const key in cells){const c=cells[key];if(c.t==='M'){c.s=c.sol;if(!c.decoy&&rnd()<.7){c.s=c.sol==='/'?'\\':'/';par++}else if(c.decoy&&rnd()<.5)c.s=c.s==='/'?'\\':'/'}}
+  if(par===0)continue;
+  const lv={N,cells,lasers,par};if(solved(lv))continue;return lv}
+ return null}
+function trace(lv,las){const segs=[];let x=0,y=las.row,dx=1,dy=0;let hit=null;segs.push([-0.5,y,0,y]);let px=-0.5,py=y;
+ for(let i=0;i<200;i++){const key=x+','+y;const c=lv.cells[key];
+  if(x<0||y<0||x>=lv.N||y>=lv.N){segs.push([px,py,x,y]);break}
+  if(c){if(c.t==='W'){segs.push([px,py,x-dx*.4,y-dy*.4]);break}
+   if(c.t==='T'){segs.push([px,py,x,y]);hit=c;break}
+   if(c.t==='M'){segs.push([px,py,x,y]);px=x;py=y;const o=c.s==='/'?[-dy,-dx]:[dy,dx];dx=o[0];dy=o[1];x+=dx;y+=dy;continue}}
+  x+=dx;y+=dy;if(x<0||y<0||x>=lv.N||y>=lv.N){segs.push([px,py,x-dx*.4,y-dy*.4]);break}}
+ return{segs,hit}}
+function solved(lv){return lv.lasers.every(l=>{const r=trace(lv,l);return r.hit&&r.hit.k===l.k})}
+function rs(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight-50-70;cv.style.width=W+'px';cv.style.height=H+'px';cv.width=W*DPR;cv.height=H*DPR;if(L)layout()}
+function layout(){CS=Math.floor(Math.min(W-20,H-10)/(L.N+1));OX=(W-CS*L.N)/2+CS*.3;OY=(H-CS*L.N)/2}
+addEventListener('resize',()=>{rs()});
+let cur=1,moves=0,hist=[],hinted=null;
+function start(n){cur=n;L=gen(n);if(!L){L=gen(n+1)}moves=0;hist=[];hinted=null;solvedAt=0;parts=[];rs();layout();document.getElementById('menu').classList.add('hide');document.getElementById('win').classList.add('hide');sv.last=n;persist();upd();if(!running){running=true;requestAnimationFrame(loop)}}
+function upd(){document.getElementById('lvl').textContent='المستوى '+cur;document.getElementById('mv').textContent='لفّات: '+moves+' / مثالي '+L.par;document.getElementById('gem').textContent='💎 '+sv.gems}
+cv.addEventListener('pointerdown',e=>{if(!L||solvedAt)return;const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left-OX)/CS),y=Math.floor((e.clientY-r.top-OY)/CS);const c=L.cells[x+','+y];if(c&&c.t==='M'){c.s=c.s==='/'?'\\':'/';moves++;hist.push(x+','+y);hinted=null;beep(420,.08,'square',.04);for(let i=0;i<6;i++)parts.push({x:x+.5,y:y+.5,vx:Math.random()-.5,vy:Math.random()-.5,l:.4,c:'#fff'});upd();if(solved(L))win()}});
+document.getElementById('undo').onclick=()=>{if(!L||solvedAt||!hist.length)return;const k=hist.pop();const c=L.cells[k];c.s=c.s==='/'?'\\':'/';moves++;upd()};
+document.getElementById('reset').onclick=()=>start(cur);
+document.getElementById('hint').onclick=()=>{if(!L||solvedAt)return;if(sv.gems<3){beep(150,.2,'sawtooth');return}for(const k in L.cells){const c=L.cells[k];if(c.t==='M'&&!c.decoy&&c.s!==c.sol){sv.gems-=3;hinted=k;persist();upd();return}}};
+document.getElementById('menub').onclick=showMenu;document.getElementById('wmenu').onclick=showMenu;
+document.getElementById('next').onclick=()=>start(cur+1);
+function win(){solvedAt=T;const ex=moves-L.par;const st=ex<=0?3:ex<=2?2:1;const old=sv.stars[cur]||0;if(st>old){sv.gems+=(st-old)*2;sv.stars[cur]=st}sv.gems+=1;persist();beep(660,.25,'sine',.07);setTimeout(()=>beep(880,.3,'sine',.07),180);setTimeout(()=>beep(1320,.4,'sine',.07),360);
+ for(let i=0;i<60;i++)parts.push({x:L.N/2,y:L.N/2,vx:(Math.random()-.5)*8,vy:(Math.random()-.5)*8,l:1.2,c:COLS[i%3]});
+ setTimeout(()=>{document.getElementById('wres').innerHTML='⭐'.repeat(st)+'☆'.repeat(3-st)+'<br>لفّاتك: '+moves+' (المثالي '+L.par+')<br>💎 '+sv.gems;document.getElementById('win').classList.remove('hide')},1100)}
+function showMenu(){document.getElementById('win').classList.add('hide');const el=document.getElementById('grid');el.innerHTML='';const done=Object.keys(sv.stars).length;const maxu=Math.max(done+1,sv.last);let tot=0;for(const k in sv.stars)tot+=sv.stars[k];document.getElementById('sum').textContent='⭐ '+tot+' · 💎 '+sv.gems+' · خلّصت '+done+' مستوى';
+ for(let i=1;i<=60;i++){const d=document.createElement('div');const unl=i<=maxu+1;d.className='lv'+(unl?'':' lock');d.innerHTML=i+'<small>'+('⭐'.repeat(sv.stars[i]||0))+'</small>';if(unl)d.onclick=()=>start(i);el.appendChild(d)}
+ document.getElementById('menu').classList.remove('hide')}
+function X(x){return OX+x*CS}function Y(y){return OY+y*CS}
+function loop(ts){T=ts/1000;draw();requestAnimationFrame(loop)}
+function draw(){g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);if(!L)return;
+ g.fillStyle='#0b0b22';g.fillRect(OX-6,OY-6,CS*L.N+12,CS*L.N+12);
+ g.strokeStyle='#1d1d48';g.lineWidth=1;for(let i=0;i<=L.N;i++){g.beginPath();g.moveTo(X(i),Y(0));g.lineTo(X(i),Y(L.N));g.stroke();g.beginPath();g.moveTo(X(0),Y(i));g.lineTo(X(L.N),Y(i));g.stroke()}
+ // beams
+ const lit=[];for(const l of L.lasers){const r=trace(L,l);const col=COLS[l.k];g.shadowColor=col;g.shadowBlur=14;g.strokeStyle=col;g.lineWidth=4;g.lineCap='round';g.beginPath();for(const s of r.segs){g.moveTo(X(s[0]+.5),Y(s[1]+.5));g.lineTo(X(s[2]+.5),Y(s[3]+.5))}g.stroke();g.shadowBlur=0;g.strokeStyle='#fff';g.lineWidth=1.5;g.stroke();
+  if(r.hit&&r.hit.k===l.k)lit.push(l.k)}
+ // laser sources
+ for(const l of L.lasers){g.fillStyle=COLS[l.k];g.fillRect(X(-.5),Y(l.row+.5)-8,12,16)}
+ // cells
+ for(const key in L.cells){const[c,r]=key.split(',').map(Number);const cell=L.cells[key];const cx=X(c+.5),cy=Y(r+.5),h=CS*.36;
+  if(cell.t==='W'){g.fillStyle='#3a3a5a';g.fillRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8);g.strokeStyle='#5a5a8a';g.strokeRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8)}
+  else if(cell.t==='T'){const on=lit.includes(cell.k);g.fillStyle=on?COLS[cell.k]:'#222';g.strokeStyle=COLS[cell.k];g.lineWidth=3;g.shadowColor=COLS[cell.k];g.shadowBlur=on?22:0;g.beginPath();g.arc(cx,cy,CS*.3*(on?1+.1*Math.sin(T*8):1),0,6.3);g.fill();g.stroke();g.shadowBlur=0;g.beginPath();g.arc(cx,cy,CS*.12,0,6.3);g.fillStyle='#fff';g.fill()}
+  else if(cell.t==='M'){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(cx-CS*.45,cy-CS*.45,CS*.9,CS*.9);g.strokeStyle=hinted===key&&Math.floor(T*4)%2?'#fd6':'#cfe8ff';g.lineWidth=hinted===key?7:5;g.lineCap='round';g.beginPath();if(cell.s==='/'){g.moveTo(cx-h,cy+h);g.lineTo(cx+h,cy-h)}else{g.moveTo(cx-h,cy-h);g.lineTo(cx+h,cy+h)}g.stroke()}}
+ for(const p of parts){p.x+=p.vx*.02;p.y+=p.vy*.02;p.l-=.016}parts=parts.filter(p=>p.l>0);for(const p of parts){g.globalAlpha=Math.max(0,p.l);g.fillStyle=p.c;g.fillRect(X(p.x),Y(p.y),4,4)}g.globalAlpha=1}
+rs();showMenu();
+window.__t={start,state:()=>L,solved,gen,trace,click:(x,y)=>{const c=L.cells[x+','+y];if(c&&c.t==='M'){c.s=c.s==='/'?'\\':'/';moves++;if(solved(L))win()}}};
+</script></body></html>
