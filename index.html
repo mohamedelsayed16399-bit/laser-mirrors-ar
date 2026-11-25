@@ -56,6 +56,7 @@ function gen(n){const rnd=mul(n*7919+13);const N=Math.min(4+Math.floor((n-1)/3),
   // decoys and walls
   const total=N*N;const dec=Math.floor(total*.15)+Math.min(n,6);let tries=0,dcount=0;while(dcount<dec&&tries<100){tries++;const x=Math.floor(rnd()*N),y=Math.floor(rnd()*N);const key=x+','+y;if(used.has(key)||cells[key])continue;
    if(rnd()<.45)cells[key]={t:'W'};else cells[key]={t:'M',sol:rnd()<.5?'/':'\\',decoy:true};dcount++}
+  if(n>=15){const fr=[];for(let x=0;x<N;x++)for(let y=0;y<N;y++){const k=x+','+y;if(!used.has(k)&&!cells[k])fr.push(k)}if(fr.length>=2){const pc=n>=30&&fr.length>=4?2:1;for(let p=0;p<pc;p++){const a=fr.splice(Math.floor(rnd()*fr.length),1)[0],b=fr.splice(Math.floor(rnd()*fr.length),1)[0];cells[a]={t:'O',o:b,id:p};cells[b]={t:'O',o:a,id:p}}}}
   // scramble
   let par=0;for(const key in cells){const c=cells[key];if(c.t==='M'){c.s=c.sol;if(!c.decoy&&rnd()<.7){c.s=c.sol==='/'?'\\':'/';par++}else if(c.decoy&&rnd()<.5)c.s=c.s==='/'?'\\':'/'}}
   if(par===0)continue;
@@ -68,6 +69,7 @@ function trace(lv,las){const segs=[];const hits=new Set();const queue=[{x:0,y:la
   if(c){if(c.t==='W'){segs.push([px,py,x-dx*.4,y-dy*.4]);break}
    if(c.t==='T'){segs.push([px,py,x,y]);hits.add(c);break}
    if(c.t==='M'){segs.push([px,py,x,y]);px=x;py=y;const o=c.s==='/'?[-dy,-dx]:[dy,dx];dx=o[0];dy=o[1];x+=dx;y+=dy;continue}
+   if(c.t==='O'){segs.push([px,py,x,y]);const[ox,oy]=c.o.split(',').map(Number);px=ox;py=oy;x=ox+dx;y=oy+dy;continue}
    if(c.t==='P'){segs.push([px,py,x,y]);px=x;py=y;queue.push({x:x+c.bx,y:y+c.by,dx:c.bx,dy:c.by,px:x,py:y});x+=dx;y+=dy;continue}}
   x+=dx;y+=dy}}
  return{segs,hits}}
@@ -113,6 +115,7 @@ function draw(){g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);if(!L)retur
  for(const key in L.cells){const[c,r]=key.split(',').map(Number);const cell=L.cells[key];const cx=X(c+.5),cy=Y(r+.5),h=CS*.36;
   if(cell.t==='W'){g.fillStyle='#3a3a5a';g.fillRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8);g.strokeStyle='#5a5a8a';g.strokeRect(cx-CS*.4,cy-CS*.4,CS*.8,CS*.8)}
   else if(cell.t==='T'){const on=lit.includes(cell);g.fillStyle=on?COLS[cell.k]:'#222';g.strokeStyle=COLS[cell.k];g.lineWidth=3;g.shadowColor=COLS[cell.k];g.shadowBlur=on?22:0;g.beginPath();g.arc(cx,cy,CS*.3*(on?1+.1*Math.sin(T*8):1),0,6.3);g.fill();g.stroke();g.shadowBlur=0;g.beginPath();g.arc(cx,cy,CS*.12,0,6.3);g.fillStyle='#fff';g.fill()}
+  else if(cell.t==='O'){const pc=cell.id?'#fa4':'#4af';g.strokeStyle=pc;g.lineWidth=3;g.shadowColor=pc;g.shadowBlur=14;for(let q=0;q<3;q++){g.beginPath();g.arc(cx,cy,CS*(.12+q*.1)*(1+.08*Math.sin(T*4+q+cell.id)),0,6.3);g.stroke()}g.shadowBlur=0}
   else if(cell.t==='P'){g.fillStyle=COLS[cell.k];g.strokeStyle='#fff';g.lineWidth=2;g.save();g.translate(cx,cy);g.rotate(Math.PI/4);g.fillRect(-CS*.22,-CS*.22,CS*.44,CS*.44);g.strokeRect(-CS*.22,-CS*.22,CS*.44,CS*.44);g.restore();g.fillStyle='#fff';g.beginPath();g.moveTo(cx+cell.bx*CS*.35,cy+cell.by*CS*.35);g.lineTo(cx+cell.bx*CS*.12-cell.by*CS*.1,cy+cell.by*CS*.12+cell.bx*CS*.1);g.lineTo(cx+cell.bx*CS*.12+cell.by*CS*.1,cy+cell.by*CS*.12-cell.bx*CS*.1);g.fill()}
   else if(cell.t==='M'){g.fillStyle='rgba(255,255,255,.06)';g.fillRect(cx-CS*.45,cy-CS*.45,CS*.9,CS*.9);g.strokeStyle=hinted===key&&Math.floor(T*4)%2?'#fd6':'#cfe8ff';g.lineWidth=hinted===key?7:5;g.lineCap='round';g.beginPath();if(cell.s==='/'){g.moveTo(cx-h,cy+h);g.lineTo(cx+h,cy-h)}else{g.moveTo(cx-h,cy-h);g.lineTo(cx+h,cy+h)}g.stroke()}}
  if(cur===1&&moves===0&&!daily&&!ta&&!solvedAt){g.fillStyle='#fff';g.font='700 15px system-ui';g.textAlign='center';g.globalAlpha=.6+.4*Math.sin(T*5);g.fillText('👆 دوس على المراية عشان تلفها',W/2,OY+CS*L.N+28);g.globalAlpha=1}
